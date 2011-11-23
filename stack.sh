@@ -80,9 +80,6 @@ source ./stackrc
 # Destination path for installation ``DEST``
 DEST=${DEST:-/opt/stack}
 
-# Configure services to syslog instead of writing to individual log files
-SYSLOG=${SYSLOG:-False}
-
 # apt-get wrapper to just get arguments set correctly
 function apt_get() {
     local sudo="sudo"
@@ -185,6 +182,17 @@ if [ ! -n "$HOST_IP" ]; then
         exit 1
     fi
 fi
+
+# Configure services to syslog instead of writing to individual log files
+SYSLOG=${SYSLOG:-False}
+if [[ "0 no false" =~ $SYSLOG ]]; then
+    SYSLOG=False
+fi
+if [[ "1 yes true" =~ $SYSLOG ]]; then
+    SYSLOG=True
+fi
+SYSLOG_HOST=${SYSLOG_HOST:-$HOST_IP}
+SYSLOG_PORT=${SYSLOG_PORT:-516}
 
 # Service startup timeout
 SERVICE_TIMEOUT=${SERVICE_TIMEOUT:-60}
@@ -552,11 +560,21 @@ cp $FILES/screenrc ~/.screenrc
 # ---------
 
 if [[ $SYSLOG != "False" ]]; then
-    # Enable rsyslog to receive messages on 514/udp
-    sudo sed -i -e '
-        /ModLoad.*imudp/s/^[#]//
-        /UDPServerRun/s/^[#]//
-    ' /etc/rsyslog.conf
+    apt_get install -y rsyslog-relp
+    if [[ "$SYSLOG_HOST" = "$HOST_IP" ]]; then
+        # Configure the master host to receive
+        cat <<EOF >/tmp/90-stack-m.conf
+\$ModLoad imrelp
+\$InputRELPServerRun $SYSLOG_PORT
+EOF
+        sudo mv /tmp/90-stack-m.conf /etc/rsyslog.d
+    else
+        # Set rsyslog to send to remote host
+        cat <<EOF >/tmp/90-stack-s.conf
+*.*		:omrelp:$SYSLOG_HOST:$SYSLOG_PORT
+EOF
+        sudo mv /tmp/90-stack-s.conf /etc/rsyslog.d
+    fi
     sudo /usr/sbin/service rsyslog restart
 fi
 
