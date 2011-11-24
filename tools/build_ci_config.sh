@@ -6,17 +6,13 @@
 function usage {
     echo "$0 - Build config.ini for openstack-integration-tests"
     echo ""
-    echo "Usage: $0 configdir"
+    echo "Usage: $0 [configdir]"
     exit 1
 }
 
-if [ ! "$#" -eq "1" ]; then
+if [ "$1" = "-h" ]; then
     usage
 fi
-
-CONFIG_DIR=$1
-CONFIG_CONF=$CONFIG_DIR/storm.conf
-CONFIG_INI=$CONFIG_DIR/config.ini
 
 # Clean up any resources that may be in use
 cleanup() {
@@ -52,6 +48,12 @@ source ./stackrc
 
 # Where Openstack code lives
 DEST=${DEST:-/opt/stack}
+
+CITEST_DIR=$DEST/openstack-integration-tests
+
+CONFIG_DIR=${1:-$CITEST_DIR/etc}
+CONFIG_CONF=$CONFIG_DIR/storm.conf
+CONFIG_INI=$CONFIG_DIR/config.ini
 
 DIST_NAME=${DIST_NAME:-oneiric}
 
@@ -90,7 +92,6 @@ function git_clone {
 # Install tests and prerequisites
 sudo PIP_DOWNLOAD_CACHE=/var/cache/pip pip install --use-mirrors `cat $TOP_DIR/files/pips/openstack-integration-tests`
 
-CITEST_DIR=$DEST/openstack-integration-tests
 git_clone $CITEST_REPO $CITEST_DIR $CITEST_BRANCH
 
 if [ ! -f $DEST/.ramdisk ]; then
